@@ -1,3 +1,4 @@
+# coding: utf-8
 from __future__ import print_function
 
 import os.path
@@ -14,7 +15,6 @@ from keras.optimizers import Adam
 from keras.callbacks import ModelCheckpoint, ReduceLROnPlateau, EarlyStopping, TensorBoard
 from keras import backend as K
 
-date_now = datetime.now()
 batch_size = 64
 nb_classes = 10
 nb_epoch = 300
@@ -29,63 +29,68 @@ growth_rate = 12
 nb_filter = 16
 dropout_rate = 0.0  # 0.0 for data augmentation
 
-model = densenet.DenseNet(img_dim, classes=nb_classes, depth=depth, nb_dense_block=nb_dense_block,
-                          growth_rate=growth_rate, nb_filter=nb_filter, dropout_rate=dropout_rate)
-print("Model created")
 
-model.summary()
-optimizer = Adam(lr=1e-4)  # Using Adam instead of SGD to speed up training
-model.compile(loss='categorical_crossentropy', optimizer=optimizer, metrics=["accuracy"])
-print("Finished compiling")
-print("Building model...")
+if __name__ == '__main__':
 
-(trainX, trainY), (testX, testY) = cifar10.load_data()
+    model = densenet.DenseNet(img_dim, classes=nb_classes, depth=depth, nb_dense_block=nb_dense_block,
+                              growth_rate=growth_rate, nb_filter=nb_filter, dropout_rate=dropout_rate)
+    print("Model created")
 
-trainX = trainX.astype('float32')
-testX = testX.astype('float32')
+    model.summary()
+    optimizer = Adam(lr=1e-4)  # Using Adam instead of SGD to speed up training
+    model.compile(loss='categorical_crossentropy', optimizer=optimizer, metrics=["accuracy"])
+    print("Finished compiling")
+    print("Building model...")
 
-trainX /= 255.
-testX /= 255.
+    (trainX, trainY), (testX, testY) = cifar10.load_data()
 
-Y_train = np_utils.to_categorical(trainY, nb_classes)
-Y_test = np_utils.to_categorical(testY, nb_classes)
+    trainX = trainX.astype('float32')
+    testX = testX.astype('float32')
 
-generator = ImageDataGenerator(rotation_range=15,
-                               width_shift_range=5. / 32,
-                               height_shift_range=5. / 32)
+    trainX /= 255.
+    testX /= 255.
 
-generator.fit(trainX, seed=0)
+    Y_train = np_utils.to_categorical(trainY, nb_classes)
+    Y_test = np_utils.to_categorical(testY, nb_classes)
 
-# Load model
-weights_file = "weights/DenseNet-40-12CIFAR10-tf.h5"
-if os.path.exists(weights_file):
-    model.load_weights(weights_file)
-    print("Model loaded.")
+    generator = ImageDataGenerator(rotation_range=15,
+                                   width_shift_range=5. / 32,
+                                   height_shift_range=5. / 32)
 
-out_dir = "weights/"
+    generator.fit(trainX, seed=0)
 
-lr_reducer = ReduceLROnPlateau(monitor='val_loss', factor=np.sqrt(0.1),
-                               cooldown=0, patience=10, min_lr=0.5e-6)
-early_stopper = EarlyStopping(monitor='val_acc', min_delta=0.0001, patience=20)
-model_checkpoint = ModelCheckpoint(weights_file, monitor="val_acc", save_best_only=True,
-                                   save_weights_only=True, mode='auto')
+    # Load model
+    weights_file = "weights/DenseNet-40-12CIFAR10-tf.h5"
+    if os.path.exists(weights_file):
+        model.load_weights(weights_file)
+        print("Model loaded.")
 
-tensor_bord = TensorBoard(log_dir="~/log_dense-net/{0.year}-{0.month}-{0.day}-{0.hour}".format(date_now),
-                          histogram_freq=1)
+    out_dir = "weights/"
 
-callbacks = [lr_reducer, early_stopper, model_checkpoint, tensor_bord]
+    lr_reducer = ReduceLROnPlateau(monitor='val_loss', factor=np.sqrt(0.1),
+                                   cooldown=0, patience=10, min_lr=0.5e-6)
+    early_stopper = EarlyStopping(monitor='val_acc', min_delta=0.0001, patience=20)
+    model_checkpoint = ModelCheckpoint(weights_file, monitor="val_acc", save_best_only=True,
+                                       save_weights_only=True, mode='auto')
 
-model.fit_generator(generator.flow(trainX, Y_train, batch_size=batch_size), samples_per_epoch=len(trainX),
-                    nb_epoch=nb_epoch,
-                    callbacks=callbacks,
-                    validation_data=(testX, Y_test),
-                    nb_val_samples=testX.shape[0], verbose=2)
+    # tensorbord の設定
+    date_now = datetime.now()
+    tensor_bord = TensorBoard(log_dir="log_dense-net/{0.year}-{0.month}-{0.day}-{0.hour}".format(date_now),
+                              histogram_freq=1)
 
-yPreds = model.predict(testX)
-yPred = np.argmax(yPreds, axis=1)
-yTrue = testY
+    callbacks = [lr_reducer, early_stopper, model_checkpoint, tensor_bord]
 
-accuracy = metrics.accuracy_score(yTrue, yPred) * 100
-error = 100 - accuracy
-print("Accuracy : ", accuracy)
-print("Error : ", error)
+    model.fit_generator(generator.flow(trainX, Y_train, batch_size=batch_size), samples_per_epoch=len(trainX),
+                        nb_epoch=nb_epoch,
+                        callbacks=callbacks,
+                        validation_data=(testX, Y_test),
+                        nb_val_samples=testX.shape[0], verbose=2)
+
+    yPreds = model.predict(testX)
+    yPred = np.argmax(yPreds, axis=1)
+    yTrue = testY
+
+    accuracy = metrics.accuracy_score(yTrue, yPred) * 100
+    error = 100 - accuracy
+    print("Accuracy : ", accuracy)
+    print("Error : ", error)
